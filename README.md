@@ -38,11 +38,18 @@ Robô em Python que coleta indicadores fundamentalistas de ações e FIIs da B3,
 
 O arquivo `Consultor_B3.pbix` lê o `Painel_Consultor.xlsx`. Depois de rodar o robô, abra o Power BI e clique em **Atualizar**. O fundo da página está em `dashboard/fundo_dashboard_b3_v6.png`.
 
-## Como rodar
+## Tecnologias
 
+- Python (yfinance, pandas, requests, pyodbc)
+- SQL Server (histórico na tabela dbo.historico_financas)
+- Excel (saída do robô e fonte de dados do dashboard)
+- Power BI (dashboard)
+
+## Como rodar
 
 pip install -r requirements.txt
 cp .env.example .env    # no Windows: copy .env.example .env
+
 # preencha o .env com seus dados
 python analise.py
 

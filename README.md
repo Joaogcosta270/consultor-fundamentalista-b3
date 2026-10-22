@@ -6,7 +6,7 @@ Projeto pessoal em Python que busca indicadores de ações e FIIs da B3, classif
 
 ## O que ele faz
 
-O robô busca dados de mais de 110 ativos (preço, P/L, P/VP, ROE, margem líquida, EV/EBITDA e dividend yield) no Status Invest e no Yahoo Finance. O dividend yield tem três fontes: se a primeira falha, ele tenta a segunda, e depois a terceira. Se uma requisição de rede falha, ele tenta de novo até 3 vezes.
+O robô busca dados de mais de 110 ativos (preço, P/L, P/VP, ROE, margem líquida, EV/EBITDA e dividend yield) no Yahoo Finance. O dividend yield é calculado pelo histórico de dividendos dos últimos 12 meses e, quando não existe histórico, usa o valor que o próprio Yahoo informa. O código também tenta o Status Invest primeiro, mas hoje essa coleta não está retornando nada. Se uma requisição de rede falha, ele tenta de novo até 3 vezes.
 
 Depois classifica cada ativo, salva tudo no Excel e no SQL Server, guarda o histórico de cada execução e manda um resumo por e-mail.
 
@@ -26,7 +26,7 @@ São filtros simples, não um modelo de valuation. Os limites estão na função
 **FIIs**
 
 - Forte compra: dividend yield acima de 10% e P/VP entre 0,70 e 1,05
-- Boa compra: dividend yield acima de 8% e P/VP até 1,20
+- Boa compra: dividend yield acima de 8% e P/VP até 1,20 (FII sem P/VP informado não entra)
 - Saudável: dividend yield acima de 6%
 - Sem rendimento informado ou baixo rendimento: o resto
 
@@ -67,7 +67,7 @@ requirements.txt         dependências
 ## Limitações conhecidas
 
 - A dívida líquida/EBITDA está vindo zerada na coleta, então as regras que dependem dela ainda não filtram nada.
-- Quando um FII não tem P/VP na coleta, o valor fica 0 e ele passa na regra de Boa compra se o dividend yield for alto.
+- A coleta do dividend yield pelo Status Invest não retornou dado em nenhum dos 116 ativos, então hoje o DY vem todo do Yahoo Finance. Possivelmente o layout do site mudou.
 - O dividend yield tem teto de 25% (`LIMITE_DY`), e vários ativos empatam nesse valor.
 - Os dados vêm de fontes públicas e podem ter falhas ou atrasos.
 

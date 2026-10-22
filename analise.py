@@ -1,19 +1,10 @@
 """
-Consultor Fundamentalista B3 — versão consolidada (um arquivo só)
+Consultor Fundamentalista B3
 
-Isso é a soma de tudo que estava separado em config.py, classificacao.py,
-coleta.py, persistencia.py, notificacao.py e main.py. Mesmo comportamento,
-só que num arquivo único pra quem preferir rodar/ler tudo junto.
+Busca indicadores de ações e FIIs, classifica cada ativo, salva no Excel e no
+SQL Server e manda um resumo por e-mail.
 
-Uso:
-    uv pip install -r requirements.txt
-    cp .env.example .env   # preencha com seus dados
-    python consultor_b3_completo.py
-
-Obs: os testes (tests/test_classificacao.py) e o dashboard (dashboard.py)
-continuam separados de propósito — testes e visualização são
-responsabilidades diferentes da coleta em si, então não fazem parte
-da soma deste script.
+Para rodar: copie o .env.example para .env, preencha e execute analise.py.
 """
 
 import os
@@ -33,10 +24,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
-# ============================================================
-# CONFIGURAÇÃO
-# ============================================================
 
 DIRETORIO_PROJETO = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_EXCEL = os.path.join(DIRETORIO_PROJETO, "Painel_Consultor.xlsx")
@@ -99,7 +86,7 @@ LISTA_ATIVOS = [
     "RDOR3",  "QUAL3",
     "AGRO3",  "PCAR3",
     "BPAC11", "KLBN11", "IGTI11", "ALUP11", "ENGI11",
-    # HGPO11 removido — "Preço inválido ou zerado".
+    # HGPO11 removido: "Preço inválido ou zerado".
     "ALZR11", "BRCR11", "BTLG11", "CPTS11", "DEVA11",
     "HCTR11", "HGLG11", "HGRU11", "IRDM11",
     "KNCR11", "KNIP11", "KNRI11", "MXRF11", "PORD11",
@@ -108,10 +95,6 @@ LISTA_ATIVOS = [
     "XPML11",
 ]
 
-
-# ============================================================
-# CLASSIFICAÇÃO (funções puras)
-# ============================================================
 
 def safe_float(value, default: float = 0.0) -> float:
     try:
@@ -147,7 +130,8 @@ def get_status(is_fii, pl, dy_pct, margem, divida, ev_ebitda, p_vpa, roe) -> str
     if is_fii:
         if dy_pct > 10 and 0.70 <= p_vpa <= 1.05:
             return "FORTE COMPRA (FII Barato + Alto Rendimento)"
-        elif dy_pct > 8 and p_vpa <= 1.20:
+        # p_vpa 0 quer dizer que não veio dado, então não pode contar como preço justo
+        elif dy_pct > 8 and 0 < p_vpa <= 1.20:
             return "BOA COMPRA (FII Rendimento alto e preco justo)"
         elif dy_pct > 6:
             return "FII Saudavel (Rendimento em linha com mercado)"
@@ -171,10 +155,6 @@ def get_status(is_fii, pl, dy_pct, margem, divida, ev_ebitda, p_vpa, roe) -> str
         else:
             return "NEUTRO (Acompanhar evolucao)"
 
-
-# ============================================================
-# COLETA (retry, fontes de DY, loop principal)
-# ============================================================
 
 def retry_com_backoff(tentativas=RETRY_TENTATIVAS, delay_inicial=RETRY_DELAY_INICIAL,
                        fator=RETRY_FATOR_BACKOFF, excecoes=(Exception,)):
@@ -282,7 +262,7 @@ def coletar_ativo(ticker: str) -> dict:
 
     moeda = info.get("currency", "BRL")
     if moeda != "BRL":
-        raise ValueError(f"Moeda {moeda} — pode ser ADR ou ticker errado.")
+        raise ValueError(f"Moeda {moeda} - pode ser ADR ou ticker errado.")
 
     preco = safe_float(info.get("currentPrice") or info.get("regularMarketPrice"))
     if preco <= 0:
@@ -294,6 +274,7 @@ def coletar_ativo(ticker: str) -> dict:
     nome = info.get("longName", ticker)
     pl = safe_float(info.get("trailingPE"))
     margem = normalizar_percentual(info.get("profitMargins"))
+    # TODO: vem sempre 0, esse campo parece não existir no retorno do yfinance
     divida = safe_float(info.get("debtToEbitda"))
     ev_ebitda = safe_float(info.get("enterpriseToEbitda"))
     p_vpa = safe_float(info.get("priceToBook"))
@@ -325,7 +306,7 @@ def coletar_todos(lista_ativos: list[str], data_hoje: str) -> tuple[list[dict], 
     contagem_fontes = {"StatusInvest": 0, "yf-historico": 0, "yf-info": 0}
 
     print(f"\n{'='*80}")
-    print(f"  CONSULTOR FUNDAMENTALISTA B3 — {data_hoje}")
+    print(f"  CONSULTOR FUNDAMENTALISTA B3 - {data_hoje}")
     print(f"  Ativos na fila : {len(lista_ativos)}")
     print(f"  Fonte DY       : Status Invest -> yf-historico -> yf-info")
     print(f"{'='*80}\n")
@@ -360,16 +341,12 @@ def coletar_todos(lista_ativos: list[str], data_hoje: str) -> tuple[list[dict], 
         f"yf-info: {contagem_fontes['yf-info']}"
     )
     if contagem_fontes["StatusInvest"] == 0 and len(dados_consolidados) > 0:
-        print("  AVISO: Status Invest não retornou nenhum DY nesta rodada — "
+        print("  AVISO: Status Invest não retornou nenhum DY nesta rodada - "
               "verifique se o layout do site mudou.")
     print(f"{'='*80}\n")
 
     return dados_consolidados, erros, contagem_fontes
 
-
-# ============================================================
-# PERSISTÊNCIA (SQL Server + Excel)
-# ============================================================
 
 def salvar_sql(dados_consolidados: list[dict]) -> None:
     if not dados_consolidados:
@@ -417,12 +394,12 @@ def salvar_sql(dados_consolidados: list[dict]) -> None:
 
         cursor.executemany(comando_sql, rows)
         conexao.commit()
-        print(f"[SQL] OK — {len(rows)} registros salvos (índice Ticker+Data garantido).")
+        print(f"[SQL] OK - {len(rows)} registros salvos (índice Ticker+Data garantido).")
 
     except Exception as e:
         if conexao:
             conexao.rollback()
-        print(f"[SQL] ERRO — Rollback. Detalhe: {e}")
+        print(f"[SQL] ERRO - Rollback. Detalhe: {e}")
     finally:
         if conexao:
             conexao.close()
@@ -439,7 +416,7 @@ def salvar_excel(dados_consolidados: list[dict], erros: list[dict]) -> None:
             except ValueError:
                 df_historico_antigo = pd.DataFrame()
             except PermissionError:
-                print("[EXCEL] AVISO — Não foi possível ler o histórico anterior "
+                print("[EXCEL] AVISO - Não foi possível ler o histórico anterior "
                       "(arquivo aberto?). Prosseguindo sem ele.")
 
         df_historico = pd.concat([df_historico_antigo, df], ignore_index=True)
@@ -468,23 +445,19 @@ def salvar_excel(dados_consolidados: list[dict], erros: list[dict]) -> None:
                 pd.DataFrame(erros).to_excel(writer, index=False, sheet_name="Erros_Log")
                 print(f"[EXCEL] {len(erros)} erros registrados na aba Erros_Log.")
 
-        print(f"[EXCEL] OK — {len(dados_consolidados)} ativos salvos em: {CAMINHO_EXCEL}")
+        print(f"[EXCEL] OK - {len(dados_consolidados)} ativos salvos em: {CAMINHO_EXCEL}")
         print(f"[EXCEL] Historico no arquivo: {len(df_historico)} registros "
               f"({df_historico['Data_Analise'].nunique()} rodadas, últimos {DIAS_RETENCAO_EXCEL} dias).")
 
     except PermissionError:
-        print("[EXCEL] ERRO — Feche o arquivo antes de rodar!")
+        print("[EXCEL] ERRO - Feche o arquivo antes de rodar!")
     except Exception as e:
-        print(f"[EXCEL] ERRO — {e}")
+        print(f"[EXCEL] ERRO - {e}")
 
-
-# ============================================================
-# NOTIFICAÇÃO (e-mail)
-# ============================================================
 
 def enviar_alerta_email(dados: list[dict], data_analise: str) -> None:
     if not EMAIL_REMETENTE or not EMAIL_SENHA_APP:
-        print("[EMAIL] AVISO — EMAIL_REMETENTE/EMAIL_SENHA_APP não configurados no "
+        print("[EMAIL] AVISO - EMAIL_REMETENTE/EMAIL_SENHA_APP não configurados no "
               ".env. Pulando envio.")
         return
 
@@ -494,7 +467,7 @@ def enviar_alerta_email(dados: list[dict], data_analise: str) -> None:
     ]
 
     if not oportunidades:
-        print("[EMAIL] Nenhuma oportunidade encontrada — e-mail não enviado.")
+        print("[EMAIL] Nenhuma oportunidade encontrada - e-mail não enviado.")
         return
 
     fortes = [d for d in oportunidades if "FORTE COMPRA" in d["Status_Consultor"]]
@@ -523,7 +496,7 @@ def enviar_alerta_email(dados: list[dict], data_analise: str) -> None:
             )
 
     corpo = (
-        f"Consultor Fundamentalista B3 — {data_analise}\n"
+        f"Consultor Fundamentalista B3 - {data_analise}\n"
         f"{'='*50}\n\n"
         + "\n".join(linhas)
         + f"\n\n{'='*50}\n"
@@ -536,7 +509,7 @@ def enviar_alerta_email(dados: list[dict], data_analise: str) -> None:
         msg["From"] = EMAIL_REMETENTE
         msg["To"] = EMAIL_DESTINATARIO
         msg["Subject"] = (
-            f"📈 B3 — {len(fortes)} Forte Compra | {len(boas)} Boa Compra | {data_analise[:10]}"
+            f"📈 B3 - {len(fortes)} Forte Compra | {len(boas)} Boa Compra | {data_analise[:10]}"
         )
         msg.attach(MIMEText(corpo, "plain", "utf-8"))
 
@@ -544,17 +517,13 @@ def enviar_alerta_email(dados: list[dict], data_analise: str) -> None:
             servidor.login(EMAIL_REMETENTE, EMAIL_SENHA_APP)
             servidor.sendmail(EMAIL_REMETENTE, EMAIL_DESTINATARIO, msg.as_bytes())
 
-        print(f"[EMAIL] OK — Alerta enviado — {len(oportunidades)} oportunidades.")
+        print(f"[EMAIL] OK - Alerta enviado - {len(oportunidades)} oportunidades.")
 
     except smtplib.SMTPAuthenticationError:
-        print("[EMAIL] ERRO — Autenticação falhou. Verifique o .env (e-mail e Senha de App).")
+        print("[EMAIL] ERRO - Autenticação falhou. Verifique o .env (e-mail e Senha de App).")
     except Exception as e:
-        print(f"[EMAIL] ERRO — {e}")
+        print(f"[EMAIL] ERRO - {e}")
 
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def main() -> None:
     data_hoje = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -566,7 +535,7 @@ def main() -> None:
         salvar_excel(dados_consolidados, erros)
         enviar_alerta_email(dados_consolidados, data_hoje)
     else:
-        print("[MAIN] Nenhum dado coletado — pulando persistência e envio de e-mail.")
+        print("[MAIN] Nenhum dado coletado - pulando persistência e envio de e-mail.")
 
 
 if __name__ == "__main__":

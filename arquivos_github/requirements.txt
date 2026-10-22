@@ -1,0 +1,6 @@
+requests
+yfinance
+pandas
+openpyxl
+pyodbc
+python-dotenv

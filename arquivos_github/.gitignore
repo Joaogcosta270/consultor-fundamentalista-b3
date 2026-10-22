@@ -1,0 +1,14 @@
+# Segredos: nunca subir
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Arquivos temporários
+*.log
+~$*
+.vscode/

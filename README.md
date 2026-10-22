@@ -6,7 +6,7 @@ Projeto pessoal em Python que busca indicadores de ações e FIIs da B3, classif
 
 ## O que ele faz
 
-O robô busca dados de mais de 110 ativos (preço, P/L, P/VP, ROE, margem líquida, EV/EBITDA e dividend yield) no Yahoo Finance. O dividend yield é calculado pelo histórico de dividendos dos últimos 12 meses e, quando não existe histórico, usa o valor que o próprio Yahoo informa. O código também tenta o Status Invest primeiro, mas hoje essa coleta não está retornando nada. Se uma requisição de rede falha, ele tenta de novo até 3 vezes.
+O robô busca dados de mais de 116 ativos (preço, P/L, P/VP, ROE, margem líquida, EV/EBITDA e dividend yield) no Yahoo Finance. O dividend yield é calculado pelo histórico de dividendos dos últimos 12 meses e, quando não existe histórico, usa o valor que o próprio Yahoo informa. O código também tenta o Status Invest primeiro, mas hoje essa coleta não está retornando nada. Se uma requisição de rede falha, ele tenta de novo até 3 vezes.
 
 Depois classifica cada ativo, salva tudo no Excel e no SQL Server, guarda o histórico de cada execução e manda um resumo por e-mail.
 
